@@ -1,5 +1,5 @@
 const TeletypePackage = require('../lib/teletype-package')
-const {Errors} = require('@atom/teletype-client')
+const {FollowState, Errors} = require('@atom/teletype-client')
 const {TextBuffer, TextEditor} = require('atom')
 
 const {buildAtomEnvironment, destroyAtomEnvironments} = require('./helpers/atom-environments')
@@ -142,6 +142,27 @@ suite('TeletypePackage', function () {
     const guestEditor3 = await getNextRemotePaneItemPromise(guestEnv)
     assert(guestEditor3 instanceof TextEditor)
     assert.equal(getPaneItems(guestEnv).length, 1)
+  })
+
+  test.only('host rapidly opening and closing editors', async () => {
+    const hostEnv = buildAtomEnvironment()
+    const hostPackage = await buildPackage(hostEnv)
+    const guestEnv = buildAtomEnvironment()
+    const guestPackage = await buildPackage(guestEnv)
+    const portalId = (await hostPackage.sharePortal()).id
+    await hostEnv.workspace.open()
+
+    const portal = await guestPackage.joinPortal(portalId)
+
+    for (let i = 0; i < 50; i++) {
+      await hostEnv.workspace.open('', {pending: true})
+      await timeout(Math.random() * 100)
+    }
+
+    hostEnv.workspace.open(path.join(temp.path(), 'final'))
+
+    await condition(() => guestEnv.workspace.getActivePaneItem().getTitle().includes('final'))
+    assert.equal(portal.resolveFollowState(), FollowState.RETRACTED)
   })
 
   test('host joining another portal as a guest', async () => {
